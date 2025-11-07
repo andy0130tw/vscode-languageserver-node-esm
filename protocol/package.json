@@ -15,14 +15,17 @@
 	"exports": {
 		".": {
 			"types": "./lib/common/api.d.ts",
+			"import": "./lib/common/api.mjs",
 			"default": "./lib/common/api.js"
 		},
 		"./node": {
 			"types": "./lib/node/main.d.ts",
+			"import": "./lib/node/main.mjs",
 			"node": "./lib/node/main.js"
 		},
 		"./browser": {
 			"types": "./lib/browser/main.d.ts",
+			"import": "./lib/browser/main.mjs",
 			"browser": "./lib/browser/main.js"
 		}
 	},
@@ -36,6 +39,7 @@
 		"postpublish": "node ../build/npm/post-publish.js",
 		"preversion": "npm test",
 		"compile": "tsc -b ./tsconfig.json",
+		"bundle:esm": "node ../build/esbuild/bundle-esm.mjs",
 		"watch": "tsc -b ./tsconfig.watch.json -w",
 		"clean": "rimraf lib && rimraf dist",
 		"lint": "eslint --ext ts src",
