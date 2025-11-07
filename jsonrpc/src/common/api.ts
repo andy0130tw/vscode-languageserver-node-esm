@@ -35,34 +35,35 @@ import RAL from './ral';
 export {
 	RAL,
 	// Export from messages
-	Message, MessageSignature, RequestMessage, RequestType, RequestType0, RequestType1, RequestType2, RequestType3, RequestType4, RequestType5, RequestType6,
-	RequestType7, RequestType8, RequestType9, ResponseError, ErrorCodes, NotificationMessage, NotificationType, NotificationType0, NotificationType1,
+	Message, RequestType, RequestType0, RequestType1, RequestType2, RequestType3, RequestType4, RequestType5, RequestType6,
+	RequestType7, RequestType8, RequestType9, ResponseError, ErrorCodes, NotificationType, NotificationType0, NotificationType1,
 	NotificationType2, NotificationType3, NotificationType4, NotificationType5, NotificationType6, NotificationType7, NotificationType8,
-	NotificationType9, ResponseMessage, ParameterStructures, _EM,
+	NotificationType9, ParameterStructures,
 	// Export from linkedMap
 	LinkedMap, Touch, LRUCache,
 	// Export from disposable
 	Disposable,
 	// Export from events
-	Event, Emitter,
-	// Export from cancellation
-	AbstractCancellationTokenSource, CancellationTokenSource, CancellationToken,
+	Event, Emitter, CancellationTokenSource, CancellationToken,
 	// Export form sharedArrayCancellation
 	SharedArraySenderStrategy, SharedArrayReceiverStrategy,
 	// Export from message reader
-	MessageReader, AbstractMessageReader, ReadableStreamMessageReader, DataCallback, MessageReaderOptions, PartialMessageInfo,
+	MessageReader, AbstractMessageReader, ReadableStreamMessageReader,
 	// Export from message write
-	MessageWriter, AbstractMessageWriter, WriteableStreamMessageWriter, MessageWriterOptions,
+	MessageWriter, AbstractMessageWriter, WriteableStreamMessageWriter,
 	// Export from abstract message buffer
-	AbstractMessageBuffer,
+	AbstractMessageBuffer, ConnectionStrategy, ConnectionOptions, NullLogger, createMessageConnection,
+	ProgressToken, ProgressType, Trace, TraceValue, TraceValues, TraceFormat, SetTraceNotification, LogTraceNotification, ConnectionErrors, ConnectionError, CancellationReceiverStrategy, IdCancellationReceiverStrategy, RequestCancellationReceiverStrategy, CancellationSenderStrategy, CancellationStrategy, MessageStrategy
+};	export type {
+	MessageSignature, RequestMessage, NotificationMessage, ResponseMessage, _EM,
+	// Export from cancellation
+	AbstractCancellationTokenSource, DataCallback, MessageReaderOptions, PartialMessageInfo, MessageWriterOptions,
 	// Export from encodings
-	ContentTypeEncoderOptions, ContentEncoder, ContentTypeEncoder, ContentTypeDecoderOptions,ContentDecoder, ContentTypeDecoder,
+	ContentTypeEncoderOptions, ContentEncoder, ContentTypeEncoder, ContentTypeDecoderOptions, ContentDecoder, ContentTypeDecoder,
 	// Export from connection
-	Logger, ConnectionStrategy, ConnectionOptions, MessageConnection, NullLogger, createMessageConnection,
-	ProgressToken, ProgressType, HandlerResult, StarRequestHandler, GenericRequestHandler,
+	Logger, MessageConnection, HandlerResult, StarRequestHandler, GenericRequestHandler,
 	RequestHandler0, RequestHandler, RequestHandler1, RequestHandler2, RequestHandler3, RequestHandler4, RequestHandler5, RequestHandler6, RequestHandler7, RequestHandler8,
 	RequestHandler9, StarNotificationHandler, GenericNotificationHandler, NotificationHandler0, NotificationHandler, NotificationHandler1, NotificationHandler2, NotificationHandler3,
-	NotificationHandler4, NotificationHandler5, NotificationHandler6, NotificationHandler7, NotificationHandler8, NotificationHandler9, Trace, TraceValue, TraceValues, TraceFormat,
-	TraceOptions, SetTraceParams, SetTraceNotification, LogTraceParams, LogTraceNotification, Tracer, ConnectionErrors, ConnectionError, CancellationId,
-	CancellationReceiverStrategy,  IdCancellationReceiverStrategy, RequestCancellationReceiverStrategy, CancellationSenderStrategy, CancellationStrategy, MessageStrategy
+	NotificationHandler4, NotificationHandler5, NotificationHandler6, NotificationHandler7, NotificationHandler8, NotificationHandler9, TraceOptions, SetTraceParams, LogTraceParams, Tracer, CancellationId
 };
+
