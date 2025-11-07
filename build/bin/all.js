@@ -24,12 +24,12 @@ if (args[0] === 'install' && process.env['npm_config_root_only'] === 'true') {
 const folders = [
 	{ folder: 'tools', scripts: ['install', 'clean', 'lint'] },
 	{ folder: 'tsconfig-gen', scripts: ['install', 'clean', 'lint'] },
-	{ folder: 'textDocument', scripts: ['install', 'clean', 'lint', 'test', 'audit'] },
+	{ folder: 'textDocument', scripts: ['install', 'clean', 'lint', 'test', 'audit', 'bundle:esm'] },
 	{ folder: 'types', scripts: ['install', 'clean', 'lint', 'test', 'audit'] },
-	{ folder: 'jsonrpc', scripts: ['install', 'clean', 'lint', 'test', 'audit'] },
-	{ folder: 'protocol', scripts: ['install', 'clean', 'lint', 'test', 'audit'] },
-	{ folder: 'server', scripts: ['install', 'clean', 'lint', 'test', 'audit'] },
-	{ folder: 'client', scripts: ['install', 'clean', 'lint', 'audit'] },
+	{ folder: 'jsonrpc', scripts: ['install', 'clean', 'lint', 'test', 'audit', 'bundle:esm'] },
+	{ folder: 'protocol', scripts: ['install', 'clean', 'lint', 'test', 'audit', 'bundle:esm'] },
+	{ folder: 'server', scripts: ['install', 'clean', 'lint', 'test', 'audit', 'bundle:esm'] },
+	{ folder: 'client', scripts: ['install', 'clean', 'lint', 'audit', 'bundle:esm'] },
 	{ folder: 'client-node-tests', scripts: ['install', 'clean', 'lint', 'test', 'audit'] }
 ];
 

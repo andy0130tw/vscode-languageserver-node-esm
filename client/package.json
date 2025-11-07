@@ -15,23 +15,29 @@
 	"bugs": {
 		"url": "https://github.com/Microsoft/vscode-languageserver-node/issues"
 	},
-	"enabledApiProposals": ["codeActionAI"],
+	"enabledApiProposals": [
+		"codeActionAI"
+	],
 	"exports": {
 		".": {
 			"types": "./lib/common/api.d.ts",
+			"import": "./lib/common/api.mjs",
 			"default": "./lib/common/api.js"
 		},
 		"./node": {
 			"types": "./lib/node/main.d.ts",
-			"node": "./lib/node/main.js"
+			"import": "./lib/node/main.mjs",
+			"require": "./lib/node/main.js"
 		},
 		"./browser": {
 			"types": "./lib/browser/main.d.ts",
+			"import": "./lib/browser/main.mjs",
 			"browser": "./lib/browser/main.js"
 		},
 		"./$test/common/*": {
 			"types": "./lib/common/*.d.ts",
-			"node": "./lib/common/*.js"
+			"import": "./lib/common/*.mjs",
+			"require": "./lib/common/*.js"
 		}
 	},
 	"devDependencies": {
@@ -50,6 +56,7 @@
 		"prepack": "npm run all:publish",
 		"compile": "tsc -b ./tsconfig.json && shx cp src/node/terminateProcess.sh lib/node/terminateProcess.sh",
 		"compile:clean": "git clean -xfd . && npm install && npm run clean && npm run compile",
+		"bundle:esm": "node ../build/esbuild/bundle-esm.mjs",
 		"watch": "tsc -b ./tsconfig.watch.json -w",
 		"lint": "eslint --ext ts src",
 		"test": "cd ../client-node-tests && npm test && cd ../client",
