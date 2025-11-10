@@ -4,19 +4,15 @@
  * ------------------------------------------------------------------------------------------ */
 
 import { _, Features, _Connection, _LanguagesImpl } from './server';
-import { SemanticTokensBuilder } from './semanticTokens';
-import type { WorkDoneProgressReporter, WorkDoneProgressServerReporter, ResultProgressReporter } from './progress';
+export { SemanticTokensBuilder } from './semanticTokens';
+export type { WorkDoneProgressReporter, WorkDoneProgressServerReporter, ResultProgressReporter } from './progress';
 
 import * as ic from './inlineCompletion.proposed';
 import * as tdc from './textDocumentContent';
 
 export * from 'vscode-languageserver-protocol';
-export { WorkDoneProgressReporter, WorkDoneProgressServerReporter, ResultProgressReporter };
-export { SemanticTokensBuilder };
-import { TextDocuments, TextDocumentsConfiguration, TextDocumentChangeEvent, TextDocumentWillSaveEvent } from './textDocuments';
-export { TextDocuments, TextDocumentsConfiguration, TextDocumentChangeEvent, TextDocumentWillSaveEvent };
-import { NotebookDocuments } from './notebook';
-export { NotebookDocuments };
+export { TextDocuments, type TextDocumentsConfiguration, type TextDocumentChangeEvent, type TextDocumentWillSaveEvent } from './textDocuments';
+export { NotebookDocuments } from './notebook';
 export * from './server';
 
 export namespace ProposedFeatures {

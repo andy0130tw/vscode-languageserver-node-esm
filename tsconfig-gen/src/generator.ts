@@ -6,7 +6,7 @@
 import * as _p from 'path';
 const path = _p.posix;
 
-import { CompilerOptions, ProjectDescription, SharableOptions, SourceFolderDescription, Arrays, ProjectOptions } from './types';
+import { CompilerOptions, ProjectDescription, type SharableOptions, SourceFolderDescription, Arrays, type ProjectOptions } from './types';
 
 namespace SharableOptions {
 	export function flatten(options: SharableOptions): SharableOptions {

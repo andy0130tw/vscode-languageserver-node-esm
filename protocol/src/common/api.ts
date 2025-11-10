@@ -11,7 +11,7 @@ export * from 'vscode-languageserver-types';
 export * from './messages';
 export * from './protocol';
 
-export { ProtocolConnection, createProtocolConnection } from './connection';
+export { type ProtocolConnection, createProtocolConnection } from './connection';
 
 export namespace LSPErrorCodes {
 	/**

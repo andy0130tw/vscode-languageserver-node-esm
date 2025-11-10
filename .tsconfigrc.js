@@ -37,7 +37,8 @@ const general = {
 	 */
 	compilerOptions: {
 		module: 'node16',
-		moduleResolution: 'node16'
+		moduleResolution: 'node16',
+		isolatedModules: true
 	}
 };
 

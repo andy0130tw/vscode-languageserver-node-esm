@@ -5,6 +5,7 @@
         ],
         "module": "umd",
         "moduleResolution": "node",
+        "isolatedModules": true,
         "rootDir": ".",
         "strict": true,
         "noImplicitAny": true,
