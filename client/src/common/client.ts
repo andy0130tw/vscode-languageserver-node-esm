@@ -11,7 +11,8 @@ import {
 	OnTypeFormattingEditProvider, RenameProvider, DocumentSymbolProvider, DocumentLinkProvider, DeclarationProvider, ImplementationProvider,
 	DocumentColorProvider, SelectionRangeProvider, TypeDefinitionProvider, CallHierarchyProvider, LinkedEditingRangeProvider, TypeHierarchyProvider, WorkspaceSymbolProvider,
 	ProviderResult, TextEdit as VTextEdit, InlineCompletionItemProvider, EventEmitter, type TabChangeEvent, TabInputText, TabInputTextDiff, TabInputCustom,
-	TabInputNotebook, type LogOutputChannel} from 'vscode';
+	TabInputNotebook, type LogOutputChannel, type TextEditor
+} from 'vscode';
 
 import {
 	RAL, Message, MessageSignature, Logger, ResponseError, RequestType0, RequestType, NotificationType0, NotificationType,
@@ -35,7 +36,7 @@ import {
 	TypeHierarchyPrepareRequest, InlineValueRequest, InlayHintRequest, WorkspaceSymbolRequest, TextDocumentRegistrationOptions, FileOperationRegistrationOptions,
 	ConnectionOptions, PositionEncodingKind, DocumentDiagnosticRequest, NotebookDocumentSyncRegistrationType, NotebookDocumentSyncRegistrationOptions, ErrorCodes,
 	MessageStrategy, DidOpenTextDocumentParams, CodeLensResolveRequest, CompletionResolveRequest, CodeActionResolveRequest, InlayHintResolveRequest, DocumentLinkResolveRequest, WorkspaceSymbolResolveRequest,
-	CancellationToken as ProtocolCancellationToken, InlineCompletionRequest, InlineCompletionRegistrationOptions, ExecuteCommandRequest, ExecuteCommandOptions, HandlerResult,
+	CancellationToken as ProtocolCancellationToken, InlineCompletionRequest, InlineCompletionRegistrationOptions, ExecuteCommandRequest, ExecuteCommandOptions, RequestParam, HandlerResult,
 	type DidCloseTextDocumentParams, type TextDocumentContentRequest
 } from 'vscode-languageserver-protocol';
 
@@ -48,8 +49,7 @@ import * as UUID from './utils/uuid';
 import { ProgressPart } from './progressPart';
 import {
 	DynamicFeature, ensure, FeatureClient, LSPCancellationError, TextDocumentSendFeature, RegistrationData, StaticFeature,
-	TextDocumentProviderFeature, WorkspaceProviderFeature,
-	type TabsModel
+	TextDocumentProviderFeature, WorkspaceProviderFeature, type VisibleDocuments
 } from './features';
 
 import { DiagnosticFeature, DiagnosticProviderMiddleware, DiagnosticProviderShape, $DiagnosticPullOptions, DiagnosticFeatureShape } from './diagnostic';
@@ -498,25 +498,23 @@ export enum ShutdownMode {
  * diagnostics we need to de-dupe tabs that show the same resources since
  * we pull on the model not the UI.
  */
-class Tabs implements TabsModel {
+class VisibleDocumentsImpl implements VisibleDocuments {
 
 	private open: Set<string>;
 	private readonly _onOpen: EventEmitter<Set<Uri>>;
 	private readonly _onClose: EventEmitter<Set<Uri>>;
-	private readonly disposable: Disposable;
+	private readonly disposables: Disposable[];
 
 	constructor() {
+		this.disposables = [];
 		this.open = new Set();
 		this._onOpen = new EventEmitter();
 		this._onClose = new EventEmitter();
-		Tabs.fillTabResources(this.open);
-		const openTabsHandler = (event: TabChangeEvent) => {
-			if (event.closed.length === 0 && event.opened.length === 0) {
-				return;
-			}
+		VisibleDocumentsImpl.fillVisibleResources(this.open);
+		const updateVisibleDocuments = () => {
 			const oldTabs = this.open;
 			const currentTabs: Set<string> = new Set();
-			Tabs.fillTabResources(currentTabs);
+			VisibleDocumentsImpl.fillVisibleResources(currentTabs);
 
 			const closed: Set<string> = new Set();
 			const opened: Set<string> = new Set(currentTabs);
@@ -544,11 +542,16 @@ class Tabs implements TabsModel {
 			}
 		};
 
-		if (Window.tabGroups.onDidChangeTabs !== undefined) {
-			this.disposable = Window.tabGroups.onDidChangeTabs(openTabsHandler);
-		} else {
-			this.disposable = { dispose: () => {} };
-		}
+		this.disposables.push(Window.tabGroups.onDidChangeTabs((event: TabChangeEvent) => {
+			if (event.closed.length === 0 && event.opened.length === 0) {
+				return;
+			}
+			updateVisibleDocuments();
+		}));
+
+		this.disposables.push(Window.onDidChangeVisibleTextEditors((_editors: readonly TextEditor[]) => {
+			updateVisibleDocuments();
+		}));
 	}
 
 	public get onClose(): Event<Set<Uri>> {
@@ -560,7 +563,7 @@ class Tabs implements TabsModel {
 	}
 
 	public dispose(): void {
-		this.disposable.dispose();
+		this.disposables.forEach(disposable => disposable.dispose());
 	}
 
 	public isActive(document: TextDocument | Uri): boolean {
@@ -584,13 +587,13 @@ class Tabs implements TabsModel {
 		return this.open.has(uri.toString());
 	}
 
-	public getTabResources(): Set<Uri> {
+	public getResources(): Set<Uri> {
 		const result: Set<Uri> = new Set();
-		Tabs.fillTabResources(new Set(), result);
+		VisibleDocumentsImpl.fillVisibleResources(new Set(), result);
 		return result;
 	}
 
-	private static fillTabResources(strings: Set<string> | undefined, uris?: Set<Uri>): void {
+	private static fillVisibleResources(strings: Set<string> | undefined, uris?: Set<Uri>): void {
 		const seen = strings ?? new Set();
 		for (const group of Window.tabGroups.all) {
 			for (const tab of group.tabs) {
@@ -609,6 +612,14 @@ class Tabs implements TabsModel {
 					seen.add(uri.toString());
 					uris !== undefined && uris.add(uri);
 				}
+			}
+		}
+		// Peek editors are not part of tabs but should be considered visible
+		for (const editor of Window.visibleTextEditors) {
+			const uri = editor.document.uri;
+			if (!seen.has(uri.toString())) {
+				seen.add(uri.toString());
+				uris !== undefined && uris.add(uri);
 			}
 		}
 	}
@@ -668,7 +679,7 @@ export abstract class BaseLanguageClient implements FeatureClient<Middleware, La
 
 	private readonly _c2p: c2p.Converter;
 	private readonly _p2c: p2c.Converter;
-	private _tabsModel: TabsModel | undefined;
+	private _visibleDocuments: VisibleDocuments | undefined;
 
 	public constructor(id: string, name: string, clientOptions: LanguageClientOptions) {
 		this._id = id;
@@ -807,11 +818,11 @@ export abstract class BaseLanguageClient implements FeatureClient<Middleware, La
 		return this._c2p;
 	}
 
-	public get tabsModel(): TabsModel {
-		if (this._tabsModel === undefined) {
-			this._tabsModel = new Tabs();
+	public get visibleDocuments(): VisibleDocuments {
+		if (this._visibleDocuments === undefined) {
+			this._visibleDocuments = new VisibleDocumentsImpl();
 		}
-		return this._tabsModel;
+		return this._visibleDocuments;
 	}
 
 	public get onTelemetry(): Event<any> {
@@ -875,9 +886,9 @@ export abstract class BaseLanguageClient implements FeatureClient<Middleware, La
 	}
 
 	public sendRequest<R, PR, E, RO>(type: ProtocolRequestType0<R, PR, E, RO>, token?: CancellationToken): Promise<R>;
-	public sendRequest<P, R, PR, E, RO>(type: ProtocolRequestType<P, R, PR, E, RO>, params: P, token?: CancellationToken): Promise<R>;
+	public sendRequest<P, R, PR, E, RO>(type: ProtocolRequestType<P, R, PR, E, RO>, params: NoInfer<RequestParam<P>>, token?: CancellationToken): Promise<R>;
 	public sendRequest<R, E>(type: RequestType0<R, E>, token?: CancellationToken): Promise<R>;
-	public sendRequest<P, R, E>(type: RequestType<P, R, E>, params: P, token?: CancellationToken): Promise<R>;
+	public sendRequest<P, R, E>(type: RequestType<P, R, E>, params: NoInfer<RequestParam<P>>, token?: CancellationToken): Promise<R>;
 	public sendRequest<R>(method: string, token?: CancellationToken): Promise<R>;
 	public sendRequest<R>(method: string, param: any, token?: CancellationToken): Promise<R>;
 	public async sendRequest<R>(type: string | MessageSignature, ...params: any[]): Promise<R> {
@@ -938,10 +949,10 @@ export abstract class BaseLanguageClient implements FeatureClient<Middleware, La
 		}
 	}
 
-	public onRequest<R, PR, E, RO>(type: ProtocolRequestType0<R, PR, E, RO>, handler: RequestHandler0<R, E>): Disposable;
-	public onRequest<P, R, PR, E, RO>(type: ProtocolRequestType<P, R, PR, E, RO>, handler: RequestHandler<P, R, E>): Disposable;
-	public onRequest<R, E>(type: RequestType0<R, E>, handler: RequestHandler0<R, E>): Disposable;
-	public onRequest<P, R, E>(type: RequestType<P, R, E>, handler: RequestHandler<P, R, E>): Disposable;
+	public onRequest<R, PR, E, RO>(type: ProtocolRequestType0<R, PR, E, RO>, handler: NoInfer<RequestHandler0<R, E>>): Disposable;
+	public onRequest<P, R, PR, E, RO>(type: ProtocolRequestType<P, R, PR, E, RO>, handler: NoInfer<RequestHandler<P, R, E>>): Disposable;
+	public onRequest<R, E>(type: RequestType0<R, E>, handler: NoInfer<RequestHandler0<R, E>>): Disposable;
+	public onRequest<P, R, E>(type: RequestType<P, R, E>, handler: NoInfer<RequestHandler<P, R, E>>): Disposable;
 	public onRequest<R, E>(method: string, handler: GenericRequestHandler<R, E>): Disposable;
 	public onRequest<R, E>(type: string | MessageSignature, handler: GenericRequestHandler<R, E>): Disposable {
 		const method = typeof type === 'string' ? type : type.method;
@@ -981,9 +992,9 @@ export abstract class BaseLanguageClient implements FeatureClient<Middleware, La
 	}
 
 	public sendNotification<RO>(type: ProtocolNotificationType0<RO>): Promise<void>;
-	public sendNotification<P, RO>(type: ProtocolNotificationType<P, RO>, params?: P): Promise<void>;
+	public sendNotification<P, RO>(type: ProtocolNotificationType<P, RO>, params?: NoInfer<RequestParam<P>>): Promise<void>;
 	public sendNotification(type: NotificationType0): Promise<void>;
-	public sendNotification<P>(type: NotificationType<P>, params?: P): Promise<void>;
+	public sendNotification<P>(type: NotificationType<P>, params?: NoInfer<RequestParam<P>>): Promise<void>;
 	public sendNotification(method: string): Promise<void>;
 	public sendNotification(method: string, params: any): Promise<void>;
 	public async sendNotification<P>(type: string | MessageSignature, params?: P): Promise<void> {
@@ -1038,9 +1049,9 @@ export abstract class BaseLanguageClient implements FeatureClient<Middleware, La
 	}
 
 	public onNotification<RO>(type: ProtocolNotificationType0<RO>, handler: NotificationHandler0): Disposable;
-	public onNotification<P, RO>(type: ProtocolNotificationType<P, RO>, handler: NotificationHandler<P>): Disposable;
+	public onNotification<P, RO>(type: ProtocolNotificationType<P, RO>, handler: NoInfer<NotificationHandler<P>>): Disposable;
 	public onNotification(type: NotificationType0, handler: NotificationHandler0): Disposable;
-	public onNotification<P>(type: NotificationType<P>, handler: NotificationHandler<P>): Disposable;
+	public onNotification<P>(type: NotificationType<P>, handler: NoInfer<NotificationHandler<P>>): Disposable;
 	public onNotification(method: string, handler: GenericNotificationHandler): Disposable;
 	public onNotification(type: string | MessageSignature, handler: GenericNotificationHandler): Disposable {
 		const method = typeof type === 'string' ? type : type.method;
@@ -1079,7 +1090,7 @@ export abstract class BaseLanguageClient implements FeatureClient<Middleware, La
 		};
 	}
 
-	public async sendProgress<P>(type: ProgressType<P>, token: string | number, value: P): Promise<void> {
+	public async sendProgress<P>(type: ProgressType<P>, token: string | number, value: NoInfer<RequestParam<P>>): Promise<void> {
 		if (this.$state === ClientState.StartFailed || this.$state === ClientState.Stopping || this.$state === ClientState.Stopped) {
 			return Promise.reject(new ResponseError(ErrorCodes.ConnectionInactive, `Client is not running`));
 		}
@@ -1093,7 +1104,7 @@ export abstract class BaseLanguageClient implements FeatureClient<Middleware, La
 		}
 	}
 
-	public onProgress<P>(type: ProgressType<P>, token: string | number, handler: NotificationHandler<P>): Disposable {
+	public onProgress<P>(type: ProgressType<P>, token: string | number, handler: NoInfer<NotificationHandler<P>>): Disposable {
 		this._progressHandlers.set(token, { type, handler });
 		const connection = this.activeConnection();
 		let disposable: Disposable;
@@ -1170,29 +1181,44 @@ export abstract class BaseLanguageClient implements FeatureClient<Middleware, La
 		return data.toString();
 	}
 
+	private shouldLogToOutputChannel(): boolean {
+		if (this.$state !== ClientState.Stopped) {
+			return true;
+		}
+		return this._outputChannel !== undefined;
+	}
+
 	public error(message: string, data?: any, showNotification: boolean | 'force' = true): void {
-		this.outputChannel.error(this.getLogMessage(message, data));
+		if (this.shouldLogToOutputChannel()) {
+			this.outputChannel.error(this.getLogMessage(message, data));
+		}
 		if (showNotification === 'force' || (showNotification && this._clientOptions.revealOutputChannelOn <= RevealOutputChannelOn.Error)) {
 			this.showNotificationMessage(MessageType.Error, message, data);
 		}
 	}
 
 	public warn(message: string, data?: any, showNotification: boolean = true): void {
-		this.outputChannel.warn(this.getLogMessage(message, data));
+		if (this.shouldLogToOutputChannel()) {
+			this.outputChannel.warn(this.getLogMessage(message, data));
+		}
 		if (showNotification && this._clientOptions.revealOutputChannelOn <= RevealOutputChannelOn.Warn) {
 			this.showNotificationMessage(MessageType.Warning, message, data);
 		}
 	}
 
 	public info(message: string, data?: any, showNotification: boolean = true): void {
-		this.outputChannel.info(this.getLogMessage(message, data));
+		if (this.shouldLogToOutputChannel()) {
+			this.outputChannel.info(this.getLogMessage(message, data));
+		}
 		if (showNotification && this._clientOptions.revealOutputChannelOn <= RevealOutputChannelOn.Info) {
 			this.showNotificationMessage(MessageType.Info, message, data);
 		}
 	}
 
 	public debug(message: string, data?: any, showNotification: boolean = true): void {
-		this.outputChannel.debug(this.getLogMessage(message, data));
+		if (this.shouldLogToOutputChannel()) {
+			this.outputChannel.debug(this.getLogMessage(message, data));
+		}
 		if (showNotification && this._clientOptions.revealOutputChannelOn <= RevealOutputChannelOn.Debug) {
 			this.showNotificationMessage(MessageType.Debug, message, data);
 		}
@@ -2362,33 +2388,33 @@ interface Connection {
 	listen(): void;
 
 	sendRequest<R, PR, E, RO>(type: ProtocolRequestType0<R, PR, E, RO>, token?: CancellationToken): Promise<R>;
-	sendRequest<P, R, PR, E, RO>(type: ProtocolRequestType<P, R, PR, E, RO>, params: P, token?: CancellationToken): Promise<R>;
+	sendRequest<P, R, PR, E, RO>(type: ProtocolRequestType<P, R, PR, E, RO>, params: NoInfer<RequestParam<P>>, token?: CancellationToken): Promise<R>;
 	sendRequest<R, E>(type: RequestType0<R, E>, token?: CancellationToken): Promise<R>;
-	sendRequest<P, R, E>(type: RequestType<P, R, E>, params: P, token?: CancellationToken): Promise<R>;
+	sendRequest<P, R, E>(type: RequestType<P, R, E>, params: NoInfer<RequestParam<P>>, token?: CancellationToken): Promise<R>;
 	sendRequest<R>(type: string | MessageSignature, ...params: any[]): Promise<R>;
 
-	onRequest<R, PR, E, RO>(type: ProtocolRequestType0<R, PR, E, RO>, handler: RequestHandler0<R, E>): Disposable;
-	onRequest<P, R, PR, E, RO>(type: ProtocolRequestType<P, R, PR, E, RO>, handler: RequestHandler<P, R, E>): Disposable;
-	onRequest<R, E>(type: RequestType0<R, E>, handler: RequestHandler0<R, E>): Disposable;
-	onRequest<P, R, E>(type: RequestType<P, R, E>, handler: RequestHandler<P, R, E>): Disposable;
+	onRequest<R, PR, E, RO>(type: ProtocolRequestType0<R, PR, E, RO>, handler: NoInfer<RequestHandler0<R, E>>): Disposable;
+	onRequest<P, R, PR, E, RO>(type: ProtocolRequestType<P, R, PR, E, RO>, handler: NoInfer<RequestHandler<P, R, E>>): Disposable;
+	onRequest<R, E>(type: RequestType0<R, E>, handler: NoInfer<RequestHandler0<R, E>>): Disposable;
+	onRequest<P, R, E>(type: RequestType<P, R, E>, handler: NoInfer<RequestHandler<P, R, E>>): Disposable;
 	onRequest<R, E>(method: string | MessageSignature, handler: GenericRequestHandler<R, E>): Disposable;
 
 	hasPendingResponse(): boolean;
 
 	sendNotification<RO>(type: ProtocolNotificationType0<RO>): Promise<void>;
-	sendNotification<P, RO>(type: ProtocolNotificationType<P, RO>, params?: P): Promise<void>;
+	sendNotification<P, RO>(type: ProtocolNotificationType<P, RO>, params?: NoInfer<RequestParam<P>>): Promise<void>;
 	sendNotification(type: NotificationType0): Promise<void>;
-	sendNotification<P>(type: NotificationType<P>, params?: P): Promise<void>;
+	sendNotification<P>(type: NotificationType<P>, params?: NoInfer<RequestParam<P>>): Promise<void>;
 	sendNotification(method: string | MessageSignature, params?: any): Promise<void>;
 
 	onNotification<RO>(type: ProtocolNotificationType0<RO>, handler: NotificationHandler0): Disposable;
-	onNotification<P, RO>(type: ProtocolNotificationType<P, RO>, handler: NotificationHandler<P>): Disposable;
+	onNotification<P, RO>(type: ProtocolNotificationType<P, RO>, handler: NoInfer<NotificationHandler<P>>): Disposable;
 	onNotification(type: NotificationType0, handler: NotificationHandler0): Disposable;
-	onNotification<P>(type: NotificationType<P>, handler: NotificationHandler<P>): Disposable;
+	onNotification<P>(type: NotificationType<P>, handler: NoInfer<NotificationHandler<P>>): Disposable;
 	onNotification(method: string | MessageSignature, handler: GenericNotificationHandler): Disposable;
 
-	onProgress<P>(type: ProgressType<P>, token: string | number, handler: NotificationHandler<P>): Disposable;
-	sendProgress<P>(type: ProgressType<P>, token: string | number, value: P): Promise<void>;
+	onProgress<P>(type: ProgressType<P>, token: string | number, handler: NoInfer<NotificationHandler<P>>): Disposable;
+	sendProgress<P>(type: ProgressType<P>, token: string | number, value: NoInfer<RequestParam<P>>): Promise<void>;
 
 	trace(value: Trace, tracer: Tracer, sendNotification?: boolean): Promise<void>;
 	trace(value: Trace, tracer: Tracer, traceOptions?: TraceOptions): Promise<void>;

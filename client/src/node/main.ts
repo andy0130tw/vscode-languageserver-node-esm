@@ -25,7 +25,7 @@ import semverSatisfies from 'semver/functions/satisfies';
 export * from 'vscode-languageserver-protocol/node';
 export * from '../common/api';
 
-const REQUIRED_VSCODE_VERSION = '^1.91.0'; // do not change format, updated by `updateVSCode` script
+const REQUIRED_VSCODE_VERSION = '^1.106.0'; // do not change format, updated by `updateVSCode` script
 
 export enum TransportKind {
 	stdio,
@@ -424,7 +424,7 @@ export class LanguageClient extends BaseLanguageClient {
 							args.push(`--socket=${transport.port}`);
 						}
 						args.push(`--clientProcessId=${process.pid.toString()}`);
-						const options: cp.ForkOptions = node.options ?? Object.create(null);
+						const options: cp.ForkOptions = node.options ? { ...node.options } : Object.create(null);
 						options.env = getEnvironment(options.env, true);
 						options.execArgv = options.execArgv || [];
 						options.cwd = serverWorkingDir;
