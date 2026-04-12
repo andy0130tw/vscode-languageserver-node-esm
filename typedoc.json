@@ -1,0 +1,10 @@
+{
+  "entryPoints": ["vscode-dts", "types", "textDocument", "server", "client", "jsonrpc", "protocol"],
+  "entryPointStrategy": "packages",
+  "router": "structure",
+  "packageOptions": {
+    "gitRevision": "85a9202a7778912161adc3b2915747096843cc01",
+    "excludePrivate": false
+  },
+  // "json": "out.json"
+}

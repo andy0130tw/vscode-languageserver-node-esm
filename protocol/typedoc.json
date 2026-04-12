@@ -1,0 +1,3 @@
+{
+  "entryPoints": ["src/common/**/*.ts", "src/browser/main.ts", "src/node/main.ts"]
+}

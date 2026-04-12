@@ -60,7 +60,7 @@ exports.softLink = async function(source, dest) {
  * @param {string} name
  * @param {string} source
  */
-const tryLink = exports.tryLink = async function(module, name, source) {
+const tryLink = exports.tryLink = async function(module, name, source, isType) {
 	const current = process.cwd();
 	try {
 		const nodeModules = path.join(module, 'node_modules');
@@ -68,6 +68,12 @@ const tryLink = exports.tryLink = async function(module, name, source) {
 			await mkdir(nodeModules);
 		}
 		process.chdir(nodeModules);
+		if (isType) {
+			if (!await exists('@types')) {
+				await mkdir('@types');
+			}
+			process.chdir(`${nodeModules}/@types`);
+		}
 		if (await exists(name)) {
 			shell.rm('-rf' , name);
 		}
@@ -91,4 +97,8 @@ exports.tryLinkJsonRpc = async function(module) {
 
 exports.tryLinkProtocol = async function(module) {
 	return tryLink(module, 'vscode-languageserver-protocol', path.join('..', '..', 'protocol'));
+};
+
+exports.tryLinkVSCDTS = async function(module) {
+	return tryLink(module, 'vscode', path.join('..', '..', '..', 'vscode-dts'), true);
 };

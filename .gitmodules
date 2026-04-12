@@ -1,0 +1,3 @@
+[submodule "vscode-dts"]
+	path = vscode-dts
+	url = https://gitlab.com/qbane/vscode-api-typedoc.git
